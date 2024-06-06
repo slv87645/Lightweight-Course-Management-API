@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, send_file
-from google.cloud import datastore, storage
+from google.cloud import datastore, storage, query
 import requests
 import json
 import io
@@ -437,7 +437,57 @@ def delete_course(id):
 
 @app.route('/' + COURSES + '/<int:id>' + '/students', methods=['PATCH'])
 def update_enrollment(id):
-    pass
+    # validate jwt
+    try:
+        payload = verify_jwt(request)
+    except AuthError:
+        return {"Error": "Unauthorized"}, 401
+
+    # make sure JWT belongs to an admin or course instructor 
+    query = client.query(kind=USERS)
+    query.add_filter('sub', '=', payload['sub'])
+    # query.add_filter('role', '=', 'admin')
+    results = list(query.fetch())
+    if not results:
+        return {"Error": "You don't have permission on this resource"}, 403
+    elif results[0].key.id != id and results[0]['role'] != 'admin':
+        return {"Error": "You don't have permission on this resource"}, 403
+    
+    # retrieve course and validate existence
+    course_key = client.key(COURSES, id)
+    course = client.get(course_key)
+    if course is None:
+        return {"Error": "You don't have permission on this resource"}, 403
+
+    # validate request 
+    content = request.get_json()
+
+    # separate arrays
+    course_enroll = content[0]
+    course_unenroll = content[1]
+
+    # check if userID appears in both arrays
+    for user_id in course_enroll:
+        if user_id in course_unenroll:
+            return {"Error": "Enrollment data is invalid"}, 409
+        
+    # check if IDs belong to students
+    for user_id in course_enroll:
+        user_key = client.key(USERS, user_id)
+        user = client.get(user_key)
+        if user is None or user['role'] != 'student':
+            return {"Error": "Enrollment data is invalid"}, 409
+        
+    # check if IDs belong to students
+    for user_id in course_unenroll:
+        user_key = client.key(USERS, user_id)
+        user = client.get(user_key)
+        if user is None or user['role'] != 'student':
+            return {"Error": "Enrollment data is invalid"}, 409
+        
+    # enroll students, skipping those already enrolled
+    
+    # unenroll students, skipping those not enrolled
 
 
 @app.route('/' + COURSES + '/<int:id>' + '/students', methods=['GET'])
