@@ -439,5 +439,11 @@ def delete_course(id):
 def update_enrollment(id):
     pass
 
+
+@app.route('/' + COURSES + '/<int:id>' + '/students', methods=['GET'])
+def get_enrollment(id):
+    pass
+
+
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=8080, debug=True)
