@@ -180,7 +180,27 @@ def get_users():
 # GET user by ID
 @app.route('/' + USERS + '/<int:id>', methods=['GET'])
 def get_user(id):
-    pass
+    # validate jwt
+    try:
+        payload = verify_jwt(request)
+    except AuthError:
+        return {"Error": "Unauthorized"}, 401
+
+    # make sure JWT belongs to an admin or course instructor 
+    query = client.query(kind=USERS)
+    query.add_filter('sub', '=', payload['sub'])
+    # query.add_filter('role', '=', 'admin')
+    results = list(query.fetch())
+    if not results:
+        return {"Error": "You don't have permission on this resource"}, 403
+
+    # retrieve course and validate existence
+    user_key = client.key(USERS, id)
+    user = client.get(user_key)
+    if user is None:
+        return {"Error": "You don't have permission on this resource"}, 403
+    elif results[0].key.id != id and results[0]['role'] != 'admin':
+        return {"Error": "You don't have permission on this resource"}, 403
 
 
 # Create/Update a user's avatar
