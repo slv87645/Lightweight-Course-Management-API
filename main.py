@@ -194,13 +194,66 @@ def get_user(id):
     if not results:
         return {"Error": "You don't have permission on this resource"}, 403
 
-    # retrieve course and validate existence
+    # retrieve user and validate existence
     user_key = client.key(USERS, id)
     user = client.get(user_key)
     if user is None:
         return {"Error": "You don't have permission on this resource"}, 403
     elif results[0].key.id != id and results[0]['role'] != 'admin':
         return {"Error": "You don't have permission on this resource"}, 403
+
+    # Search for user's avatar using user ID
+    query = client.query(kind=PHOTOS)
+    query.add_filter('user_id', '=', id)
+    results = list(query.fetch())
+    if not results:
+
+        # return admin response without avatar url
+        if user['role'] == 'admin':
+            user['id'] = user.key.id
+            return user, 200
+
+        # return instructor response without avatar url, look for courses instructor teaches
+        elif user['role'] == 'instructor':
+            instructing_query = client.query(kind=COURSES)
+            instructing_query.add_filter('instructor_id', '=', id)
+            instructing_results = list(instructing_query.fetch())
+
+            if not instructing_results:
+                if 'courses' in user:
+                    user['id'] = user.key.id
+                    return user, 200
+                else:
+                    user['id'] = user.key.id
+                    user['courses'] = []
+                    return user, 200
+                
+            for course in instructing_results:
+                if 'courses' in user:
+                    user['courses'].append(request.scheme + '://' + request.host + '/users/' + str(course.key.id))
+                else:
+                    user['courses'] = [request.scheme + '://' + request.host + '/users/' + str(course.key.id)]
+
+            user['id'] = user.key.id
+            return user, 200
+        
+        # return student response without avatar url, look for courses student enrolled in
+        else:
+            # student is enrolled in courses
+            if 'courses' in user:
+                for course in user['courses']:
+                    course = request.scheme + '://' + request.host + '/users/' + str(course.key.id)
+                user['id'] = user.key.id
+                return user, 200
+            
+            # student is not enrolled in courses
+            user['courses'] = []
+            user['id'] = user.key.id
+            return user, 200
+
+
+    # return admin response with avatar URL
+    # return student or instructor response with avatar url
 
 
 # Create/Update a user's avatar
