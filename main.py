@@ -219,6 +219,7 @@ def get_user(id):
             instructing_query.add_filter('instructor_id', '=', id)
             instructing_results = list(instructing_query.fetch())
 
+            # instructor has no courses
             if not instructing_results:
                 if 'courses' in user:
                     user['id'] = user.key.id
@@ -227,33 +228,80 @@ def get_user(id):
                     user['id'] = user.key.id
                     user['courses'] = []
                     return user, 200
-                
+
+            # instructor has courses
             for course in instructing_results:
                 if 'courses' in user:
-                    user['courses'].append(request.scheme + '://' + request.host + '/users/' + str(course.key.id))
+                    user['courses'].append(request.scheme + '://' + request.host + '/courses/' + str(course.key.id))
                 else:
-                    user['courses'] = [request.scheme + '://' + request.host + '/users/' + str(course.key.id)]
+                    user['courses'] = [request.scheme + '://' + request.host + '/courses/' + str(course.key.id)]
 
             user['id'] = user.key.id
             return user, 200
-        
+
         # return student response without avatar url, look for courses student enrolled in
         else:
-            # student is enrolled in courses
+            # student already has courses property
             if 'courses' in user:
                 for course in user['courses']:
-                    course = request.scheme + '://' + request.host + '/users/' + str(course.key.id)
+                    course = request.scheme + '://' + request.host + '/courses/' + str(course.key.id)
                 user['id'] = user.key.id
                 return user, 200
-            
-            # student is not enrolled in courses
+
+            # student does not yet have courses property
             user['courses'] = []
             user['id'] = user.key.id
             return user, 200
 
-
     # return admin response with avatar URL
-    # return student or instructor response with avatar url
+    if user['role'] == 'admin':
+        user['id'] = user.key.id
+        user['avatar_url'] = request.scheme + '://' + request.host + '/users/' + str(id) + '/avatar'
+        return user, 200
+
+    # return instructor response with avatar url
+    elif user['role'] == 'instructor':
+        instructing_query = client.query(kind=COURSES)
+        instructing_query.add_filter('instructor_id', '=', id)
+        instructing_results = list(instructing_query.fetch())
+
+        # instructor has no courses
+        if not instructing_results:
+            if 'courses' in user:
+                user['id'] = user.key.id
+                user['avatar_url'] = request.scheme + '://' + request.host + '/users/' + str(id) + '/avatar'
+                return user, 200
+            else:
+                user['id'] = user.key.id
+                user['avatar_url'] = request.scheme + '://' + request.host + '/users/' + str(id) + '/avatar'
+                user['courses'] = []
+                return user, 200
+
+        # instructor has courses
+        for course in instructing_results:
+            if 'courses' in user:
+                user['courses'].append(request.scheme + '://' + request.host + '/courses/' + str(course.key.id))
+            else:
+                user['courses'] = [request.scheme + '://' + request.host + '/courses/' + str(course.key.id)]
+
+        user['id'] = user.key.id
+        user['avatar_url'] = request.scheme + '://' + request.host + '/users/' + str(id) + '/avatar'
+        return user, 200
+
+    else:
+        # student already has courses property
+        if 'courses' in user:
+            for course in user['courses']:
+                course = request.scheme + '://' + request.host + '/courses/' + str(course.key.id)
+            user['avatar_url'] = request.scheme + '://' + request.host + '/users/' + str(id) + '/avatar'
+            user['id'] = user.key.id
+            return user, 200
+
+        # student does not yet have courses property
+        user['courses'] = []
+        user['avatar_url'] = request.scheme + '://' + request.host + '/users/' + str(id) + '/avatar'
+        user['id'] = user.key.id
+        return user, 200
 
 
 # Create/Update a user's avatar
