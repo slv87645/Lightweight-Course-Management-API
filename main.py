@@ -451,65 +451,75 @@ def update_enrollment(id):
     results = list(query.fetch())
     if not results:
         return {"Error": "You don't have permission on this resource"}, 403
-    elif results[0].key.id != id and results[0]['role'] != 'admin':
-        return {"Error": "You don't have permission on this resource"}, 403
-    
+
     # retrieve course and validate existence
     course_key = client.key(COURSES, id)
     course = client.get(course_key)
     if course is None:
+        return {"Error": "You don't have permission on this resource"}, 403
+    elif results[0].key.id != course['instructor_id'] and results[0]['role'] != 'admin':
         return {"Error": "You don't have permission on this resource"}, 403
 
     # validate request 
     content = request.get_json()
 
     # separate arrays
-    course_enroll = content[0]
-    course_unenroll = content[1]
+    course_enroll = content['add']
+    course_unenroll = content['remove']
 
     # check if userID appears in both arrays
     for user_id in course_enroll:
         if user_id in course_unenroll:
             return {"Error": "Enrollment data is invalid"}, 409
-        
-    # check if IDs belong to students then enroll
+
+    # check if IDs belong to students
     for user_id in course_enroll:
         user_key = client.key(USERS, user_id)
         user = client.get(user_key)
 
         if user is None or user['role'] != 'student':
             return {"Error": "Enrollment data is invalid"}, 409
-        
-        if id in user_id['courses']:
-            continue
-        
-        # handle whether the user has courses property yet 
-        if 'courses' in user:
-            if isinstance(user['courses'], list):
-                user['courses'].append(id)
-                print(user['courses'])
-            else:
-                user['courses'] = [id]
-                print(user['courses'])
 
-    # check if IDs belong to students then unenroll
+    # enroll
+    for user_id in course_enroll:
+        user_key = client.key(USERS, user_id)
+        user = client.get(user_key)
+
+        # handle whether the user has courses property yet
+        if 'courses' in user:
+            if id in user['courses']:
+                print('Student already enrolled in course.')
+                continue
+            user['courses'].append(id)
+            client.put(user)
+            print('added course into existing array')
+        else:
+            user['courses'] = [id]
+            client.put(user)
+            print('added course into non-existing array')
+
+    # check if IDs belong to students
     for user_id in course_unenroll:
         user_key = client.key(USERS, user_id)
         user = client.get(user_key)
+
         if user is None or user['role'] != 'student':
             return {"Error": "Enrollment data is invalid"}, 409
-        if id in user_id['courses']:
-            continue
-        
-        # handle whether the user has courses property yet 
-        if 'courses' in user:
-            if isinstance(user['courses'], list):
-                user['courses'].remove(id)
-                print(user['courses'])
-            else:
-                continue
 
-    return 
+        # unenroll
+    for user_id in course_unenroll:
+        user_key = client.key(USERS, user_id)
+        user = client.get(user_key)
+
+        # handle whether the user has courses property yet
+        if 'courses' in user:
+            if id not in user['courses']:
+                continue
+            user['courses'].remove(id)
+            client.put(user)
+            print('removed course from existing array')
+
+    return '', 200
 
 
 @app.route('/' + COURSES + '/<int:id>' + '/students', methods=['GET'])
@@ -529,13 +539,13 @@ def get_enrollment(id):
         return {"Error": "You don't have permission on this resource"}, 403
     elif results[0].key.id != id and results[0]['role'] != 'admin':
         return {"Error": "You don't have permission on this resource"}, 403
-    
+
     # retrieve course and validate existence
     course_key = client.key(COURSES, id)
     course = client.get(course_key)
     if course is None:
         return {"Error": "You don't have permission on this resource"}, 403
-    
+
     enrollment = []
     # get list of users
     query = client.query(kind=USERS)
@@ -545,7 +555,7 @@ def get_enrollment(id):
     for user in results:
         if id in user['courses']:
             enrollment.append(user.key.id)
-    
+
     # array of users enrolled in course
     return enrollment
 
