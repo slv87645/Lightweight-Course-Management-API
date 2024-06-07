@@ -433,7 +433,40 @@ def update_course(id):
 
 @app.route('/' + COURSES + '/<int:id>', methods=['DELETE'])
 def delete_course(id):
-    pass
+    # validate jwt
+    try:
+        payload = verify_jwt(request)
+    except AuthError:
+        return {"Error": "Unauthorized"}, 401
+
+    # make sure JWT belongs to an admin or course instructor
+    query = client.query(kind=USERS)
+    query.add_filter('sub', '=', payload['sub'])
+    query.add_filter('role', '=', 'admin')
+    results = list(query.fetch())
+    if not results:
+        return {"Error": "You don't have permission on this resource"}, 403
+
+    # retrieve course and validate existence
+    course_key = client.key(COURSES, id)
+    course = client.get(course_key)
+    if course is None:
+        return {"Error": "You don't have permission on this resource"}, 403
+
+    # delete student enrollment
+    query2 = client.query(kind=USERS)
+    query2.add_filter('role', '=', 'student')
+    results = list(query2.fetch())
+    for user in results:
+        if 'courses' in user:
+            if id not in user['courses']:
+                continue
+            user['courses'].remove(id)
+            client.put(user)
+
+    # delete course
+    client.delete(course_key)
+    return ('', 204)
 
 
 @app.route('/' + COURSES + '/<int:id>' + '/students', methods=['PATCH'])
@@ -460,7 +493,7 @@ def update_enrollment(id):
     elif results[0].key.id != course['instructor_id'] and results[0]['role'] != 'admin':
         return {"Error": "You don't have permission on this resource"}, 403
 
-    # validate request 
+    # validate request
     content = request.get_json()
 
     # separate arrays
@@ -530,35 +563,37 @@ def get_enrollment(id):
     except AuthError:
         return {"Error": "Unauthorized"}, 401
 
-    # make sure JWT belongs to an admin or course instructor 
+    # make sure JWT belongs to an admin or course instructor
     query = client.query(kind=USERS)
     query.add_filter('sub', '=', payload['sub'])
     # query.add_filter('role', '=', 'admin')
     results = list(query.fetch())
     if not results:
-        return {"Error": "You don't have permission on this resource"}, 403
-    elif results[0].key.id != id and results[0]['role'] != 'admin':
-        return {"Error": "You don't have permission on this resource"}, 403
+        return {"Error": "You don't have permission on this resource1"}, 403
 
     # retrieve course and validate existence
     course_key = client.key(COURSES, id)
     course = client.get(course_key)
     if course is None:
-        return {"Error": "You don't have permission on this resource"}, 403
+        return {"Error": "You don't have permission on this resource3"}, 403
+    elif results[0].key.id != course['instructor_id'] and results[0]['role'] != 'admin':
+        return {"Error": "You don't have permission on this resource2"}, 403
 
     enrollment = []
+
     # get list of users
     query = client.query(kind=USERS)
     query.add_filter('role', '=', 'student')
     results = list(query.fetch())
+
     # filter out users who have course ID in course property
     for user in results:
-        if id in user['courses']:
-            enrollment.append(user.key.id)
+        if 'courses' in user:
+            if id in user['courses']:
+                enrollment.append(user.key.id)
 
     # array of users enrolled in course
     return enrollment
-
 
 
 if __name__ == '__main__':
