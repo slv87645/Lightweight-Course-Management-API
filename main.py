@@ -171,10 +171,14 @@ def get_users():
 
     query2 = client.query(kind=USERS)
     results2 = list(query2.fetch())
+
+    filtered_users = []
     for r in results2:
         r['id'] = r.key.id
+        filter_r = {key: value for key, value in r.items() if key != 'courses'}
+        filtered_users.append(filter_r)
 
-    return results2
+    return filtered_users
 
 
 # GET user by ID
@@ -338,14 +342,26 @@ def create_avatar(id):
     # Upload the file into Cloud Storage
     blob.upload_from_file(file_obj)
 
-    # Store photo information in Datastore
-    new_photo = datastore.Entity(key=client.key(PHOTOS))
-    new_photo.update({
-        'user_id': id,
-        'name': file_obj.filename,
-    })
-    client.put(new_photo)
+    # Search for user's avatar using user ID
+    query = client.query(kind=PHOTOS)
+    query.add_filter('user_id', '=', id)
+    results = list(query.fetch())
+    # no current avatar photo
+    if not results:
+        # Store photo information in Datastore
+        new_photo = datastore.Entity(key=client.key(PHOTOS))
+        new_photo.update({
+            'user_id': id,
+            'name': file_obj.filename,
+        })
+        client.put(new_photo)
+        return {'avatar_url': request.scheme + '://' + request.host + '/users/' + str(id) + '/avatar'}, 200
 
+    # updating current avatar photo
+    results[0].update({
+        'name': file_obj.filename
+    })
+    client.put(results[0])
     return {'avatar_url': request.scheme + '://' + request.host + '/users/' + str(id) + '/avatar'}, 200
 
 
@@ -415,6 +431,9 @@ def delete_avatar(id):
     bucket = storage_client.get_bucket(PHOTO_BUCKET)
     blob = bucket.blob(results[0]['name'])
     blob.delete()
+
+    photo_key = client.key(PHOTOS, results[0].key.id)
+    client.delete(photo_key)
     return '', 204
 
 
