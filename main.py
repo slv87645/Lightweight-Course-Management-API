@@ -471,23 +471,44 @@ def update_enrollment(id):
         if user_id in course_unenroll:
             return {"Error": "Enrollment data is invalid"}, 409
         
-    # check if IDs belong to students
+    # check if IDs belong to students then enroll
     for user_id in course_enroll:
         user_key = client.key(USERS, user_id)
         user = client.get(user_key)
+
         if user is None or user['role'] != 'student':
             return {"Error": "Enrollment data is invalid"}, 409
         
-    # check if IDs belong to students
+        if id in user_id['courses']:
+            continue
+        
+        # handle whether the user has courses property yet 
+        if 'courses' in user:
+            if isinstance(user['courses'], list):
+                user['courses'].append(id)
+                print(user['courses'])
+            else:
+                user['courses'] = [id]
+                print(user['courses'])
+
+    # check if IDs belong to students then unenroll
     for user_id in course_unenroll:
         user_key = client.key(USERS, user_id)
         user = client.get(user_key)
         if user is None or user['role'] != 'student':
             return {"Error": "Enrollment data is invalid"}, 409
+        if id in user_id['courses']:
+            continue
         
-    # enroll students, skipping those already enrolled
-    
-    # unenroll students, skipping those not enrolled
+        # handle whether the user has courses property yet 
+        if 'courses' in user:
+            if isinstance(user['courses'], list):
+                user['courses'].remove(id)
+                print(user['courses'])
+            else:
+                continue
+
+    return 
 
 
 @app.route('/' + COURSES + '/<int:id>' + '/students', methods=['GET'])
