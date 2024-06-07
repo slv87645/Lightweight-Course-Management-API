@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, send_file
-from google.cloud import datastore, storage, query
+from google.cloud import datastore, storage
+from google.cloud.datastore import query
 import requests
 import json
 import io
@@ -513,7 +514,41 @@ def update_enrollment(id):
 
 @app.route('/' + COURSES + '/<int:id>' + '/students', methods=['GET'])
 def get_enrollment(id):
-    pass
+    # validate jwt
+    try:
+        payload = verify_jwt(request)
+    except AuthError:
+        return {"Error": "Unauthorized"}, 401
+
+    # make sure JWT belongs to an admin or course instructor 
+    query = client.query(kind=USERS)
+    query.add_filter('sub', '=', payload['sub'])
+    # query.add_filter('role', '=', 'admin')
+    results = list(query.fetch())
+    if not results:
+        return {"Error": "You don't have permission on this resource"}, 403
+    elif results[0].key.id != id and results[0]['role'] != 'admin':
+        return {"Error": "You don't have permission on this resource"}, 403
+    
+    # retrieve course and validate existence
+    course_key = client.key(COURSES, id)
+    course = client.get(course_key)
+    if course is None:
+        return {"Error": "You don't have permission on this resource"}, 403
+    
+    enrollment = []
+    # get list of users
+    query = client.query(kind=USERS)
+    query.add_filter('role', '=', 'student')
+    results = list(query.fetch())
+    # filter out users who have course ID in course property
+    for user in results:
+        if id in user['courses']:
+            enrollment.append(user.key.id)
+    
+    # array of users enrolled in course
+    return enrollment
+
 
 
 if __name__ == '__main__':
