@@ -247,9 +247,11 @@ def get_user(id):
         else:
             # student already has courses property
             if 'courses' in user:
+                updated_courses = []
                 for course in user['courses']:
-                    course = request.scheme + '://' + request.host + '/courses/' + str(course.key.id)
+                    updated_courses.append(request.scheme + '://' + request.host + '/courses/' + str(course))
                 user['id'] = user.key.id
+                user['courses'] = updated_courses
                 return user, 200
 
             # student does not yet have courses property
@@ -295,10 +297,12 @@ def get_user(id):
     else:
         # student already has courses property
         if 'courses' in user:
+            updated_courses = []
             for course in user['courses']:
-                course = request.scheme + '://' + request.host + '/courses/' + str(course.key.id)
+                updated_courses.append(request.scheme + '://' + request.host + '/courses/' + str(course))
             user['avatar_url'] = request.scheme + '://' + request.host + '/users/' + str(id) + '/avatar'
             user['id'] = user.key.id
+            user['courses'] = updated_courses
             return user, 200
 
         # student does not yet have courses property
