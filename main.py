@@ -19,9 +19,9 @@ PHOTOS = 'photos'
 COURSES = 'courses'
 
 # Update the values of the following 3 variables
-CLIENT_ID = 'WFeVPNKdMv6sBh1EGFSpiO47fSFJFYJq'
-CLIENT_SECRET = 'J7_s-QpcFGt01gMRp12kP34OdBmNY3x8jMgwMryV9lz188P5Ms7KCCiAv_zVtEvJ'
-DOMAIN = 'dev-qsk3xmthsv2vlq24.us.auth0.com'
+CLIENT_ID = 
+CLIENT_SECRET = 
+DOMAIN = 
 # For example
 # DOMAIN = '493-24-spring.us.auth0.com'
 # Note: don't include the protocol in the value of the variable DOMAIN
