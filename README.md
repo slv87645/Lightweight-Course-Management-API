@@ -1,2 +1,2 @@
-# Tarpaulin Lightweight Course Management API
+# Lightweight Course Management API
  
